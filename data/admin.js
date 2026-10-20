@@ -1,125 +1,63 @@
-const form = document.querySelector("#config-form");
-const countInput = document.querySelector("#relay-count");
-const settings = document.querySelector("#relay-settings");
+const form = document.querySelector("#settings-form");
 const message = document.querySelector("#message");
 
-let relayData = [];
-
 async function request(url, options = {}) {
-  const response = await fetch(url, options);
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  return response.json();
+  const response = await fetch(url, { cache: "no-store", ...options });
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
 }
 
-function renderRelays() {
-  const count = Number(countInput.value);
-  settings.replaceChildren();
-
-  for (const relay of relayData) {
-    const index = relay.index;
-    const section = document.createElement("section");
-    section.className = "admin-relay";
-    section.hidden = index >= count;
-
-    const heading = document.createElement("h3");
-    heading.textContent = `Реле ${index + 1}`;
-
-    const nameLabel = document.createElement("label");
-    nameLabel.className = "field";
-    nameLabel.textContent = "Короткое имя (до 8 байт)";
-
-    const name = document.createElement("input");
-    name.type = "text";
-    name.name = `name${index}`;
-    name.maxLength = 8;
-    name.required = true;
-    name.value = relay.name || "";
-
-    nameLabel.append(name);
-
-    const commentLabel = document.createElement("label");
-    commentLabel.className = "field";
-    commentLabel.textContent = "Комментарий";
-
-    const comment = document.createElement("textarea");
-    comment.name = `comment${index}`;
-    comment.maxLength = 95;
-    comment.value = relay.comment || "";
-
-    commentLabel.append(comment);
-
-    const startupLabel = document.createElement("label");
-    startupLabel.className = "checkbox-row";
-
-    const startup = document.createElement("input");
-    startup.type = "checkbox";
-    startup.name = `startup${index}`;
-    startup.checked = Boolean(relay.startupOn);
-
-    startupLabel.append(startup, document.createTextNode(
-      "Включать после перезагрузки"
-    ));
-
-    section.append(heading, nameLabel, commentLabel, startupLabel);
-    settings.append(section);
-  }
+async function loadSettings() {
+  const c = await request("/api/admin/settings");
+  form.elements.stationName.value = c.stationName || "GooseLights";
+  form.elements.ssid0.value = c.ssid0 || "";
+  form.elements.ssid1.value = c.ssid1 || "";
+  form.elements.ntp0.value = c.ntp0 || "";
+  form.elements.ntp1.value = c.ntp1 || "";
+  form.elements.timezone.value = c.timezone || "";
+  form.elements.password0.value = "";
+  form.elements.password1.value = "";
+  form.elements.adminPassword.value = "";
+  message.textContent = `Настройки загружены. Пароль Wi-Fi задан: профиль 1 — ${c.passwordSet0 ? "да" : "нет"}; профиль 2 — ${c.passwordSet1 ? "да" : "нет"}.`;
 }
 
-countInput.addEventListener("input", renderRelays);
-
-async function loadConfig() {
-  const config = await request("/api/admin/config");
-  relayData = config.relays;
-  countInput.value = config.relayCount;
-  renderRelays();
-  message.textContent = "Конфигурация загружена";
+for (const i of [0, 1]) {
+  form.elements[`clearPassword${i}`].addEventListener("change", (e) => {
+    if (e.target.checked) form.elements[`password${i}`].value = "";
+  });
+  form.elements[`password${i}`].addEventListener("input", (e) => {
+    if (e.target.value) form.elements[`clearPassword${i}`].checked = false;
+  });
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-
   const body = new URLSearchParams();
-  body.set("relayCount", countInput.value);
-
-  for (const relay of relayData) {
-    const i = relay.index;
-    const section = settings.querySelector(
-      `.admin-relay:nth-child(${i + 1})`
-    );
-
-    if (!section) continue;
-
-    body.set(`name${i}`, section.querySelector(`[name="name${i}"]`).value);
-    body.set(
-      `comment${i}`,
-      section.querySelector(`[name="comment${i}"]`).value
-    );
-    body.set(
-      `startup${i}`,
-      section.querySelector(`[name="startup${i}"]`).checked ? "1" : "0"
-    );
+  for (const key of ["stationName", "ssid0", "password0", "ntp0", "ntp1", "timezone", "ssid1", "password1", "adminPassword"]) {
+    body.set(key, form.elements[key].value);
   }
-
+  body.set("clearPassword0", form.elements.clearPassword0.checked ? "1" : "0");
+  body.set("clearPassword1", form.elements.clearPassword1.checked ? "1" : "0");
   try {
-    await request("/api/admin/config", {
+    const result = await request("/api/admin/settings", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body
     });
-
-    message.textContent = "Настройки сохранены";
+    message.textContent = result.wifiChanged
+      ? "Настройки сохранены. Переподключение к Wi-Fi начнётся через 1,5 секунды; адрес устройства может измениться."
+      : "Настройки сохранены. Настройки времени применяются автоматически.";
+    form.elements.adminPassword.value = "";
+    form.elements.password0.value = "";
+    form.elements.password1.value = "";
+    if (result.wifiChanged) message.textContent += " Найдите новый IP в Serial Monitor или в списке DHCP-клиентов роутера.";
   } catch (error) {
     message.textContent = `Ошибка сохранения: ${error.message}`;
   }
 });
 
-loadConfig().catch((error) => {
-  message.textContent =
-    `Не удалось загрузить настройки: ${error.message}`;
+loadSettings().catch((error) => {
+  message.textContent = `Не удалось загрузить настройки: ${error.message}`;
 });

@@ -16,6 +16,10 @@ void begin() {
     configured = false;
     synced = false;
 }
+void reconfigure() {
+    configured = false;
+    synced = false;
+}
 void loop() {
     if (!WifiManager::connected() || !Config::isReady()) return;
 

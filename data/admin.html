@@ -3,30 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Настройки goose-light</title>
+  <title>Общие настройки — goose-light</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/admin.js" defer></script>
 </head>
 <body>
   <header>
-    <div>
-      <h1>Настройки</h1>
-      <p>goose-light</p>
-    </div>
-    <a href="/">К управлению реле</a>
+    <div><h1>Общие настройки</h1><p>goose-light</p></div>
+    <nav><a href="/admin/relays">Настройки реле</a> · <a href="/">К управлению</a></nav>
   </header>
-
   <main>
-    <p id="message" role="status">Загрузка конфигурации…</p>
-
-    <form id="config-form">
-      <div class="field">
-        <label for="relay-count">Количество активных реле</label>
-        <input id="relay-count" type="number" min="1" max="24" required>
-      </div>
-
-      <section id="relay-settings"></section>
-
+    <p id="message" role="status">Загрузка настроек…</p>
+    <form id="settings-form">
+      <section class="admin-relay">
+        <h2>Wi-Fi</h2>
+        <p>Если задан хотя бы один SSID, контроллер будет подключаться к сохранённой сети и не будет переходить в режим точки доступа настройки. Если сети недоступны, он продолжит попытки подключения.</p>
+        <div class="field"><label for="station-name">Имя устройства в сети (hostname)</label><input id="station-name" name="stationName" type="text" maxlength="32" required pattern="[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9]|[A-Za-z0-9]" autocomplete="off"></div>
+        <div class="field"><label for="ssid0">Wi-Fi профиль 1 — имя сети (SSID)</label><input id="ssid0" name="ssid0" type="text" maxlength="32" autocomplete="off"></div>
+        <div class="field"><label for="password0">Пароль Wi-Fi профиля 1</label><input id="password0" name="password0" type="password" maxlength="63" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять"></div>
+        <label class="checkbox-row"><input id="clearPassword0" name="clearPassword0" type="checkbox" value="1"> Очистить пароль профиля 1 (открытая сеть)</label>
+        <div class="field"><label for="ssid1">Wi-Fi профиль 2 — имя сети (SSID, необязательно)</label><input id="ssid1" name="ssid1" type="text" maxlength="32" autocomplete="off"></div>
+        <div class="field"><label for="password1">Пароль Wi-Fi профиля 2</label><input id="password1" name="password1" type="password" maxlength="63" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять"></div>
+        <label class="checkbox-row"><input id="clearPassword1" name="clearPassword1" type="checkbox" value="1"> Очистить пароль профиля 2 (открытая сеть)</label>
+      </section>
+      <section class="admin-relay">
+        <h2>Дата и время</h2>
+        <div class="field"><label for="ntp0">NTP-сервер 1</label><input id="ntp0" name="ntp0" type="text" maxlength="63" required></div>
+        <div class="field"><label for="ntp1">NTP-сервер 2</label><input id="ntp1" name="ntp1" type="text" maxlength="63"></div>
+        <div class="field"><label for="timezone">Часовой пояс (POSIX TZ)</label><input id="timezone" name="timezone" type="text" maxlength="47" required></div>
+        <p>Пример для Восточной Европы с переходом на летнее время: <code>EET-2EEST,M3.5.0/3,M10.5.0/4</code></p>
+      </section>
+      <section class="admin-relay">
+        <h2>Безопасность</h2>
+        <div class="field"><label for="admin-password">Новый пароль администратора</label><input id="admin-password" name="adminPassword" type="password" minlength="8" maxlength="63" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять"></div>
+        <p>После смены пароля браузер может запросить повторную авторизацию. Используется имя пользователя <code>admin</code>.</p>
+      </section>
       <button type="submit">Сохранить настройки</button>
     </form>
   </main>

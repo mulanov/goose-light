@@ -3,10 +3,13 @@
 #include <Arduino.h>
 #include <ESP8266WebServer.h>
 #include <LittleFS.h>
+#include <ESP8266WiFi.h>
+#include <cstring>
 
 #include "Config.h"
 #include "Relay.h"
 #include "WifiManager.h"
+#include "TimeManager.h"
 
 namespace {
 ESP8266WebServer server(80);
@@ -87,6 +90,11 @@ void handleRoot() {
 void handleAdminPage() {
     if (!requireAdmin()) return;
     sendFile("/admin.html", "text/html; charset=utf-8");
+}
+
+void handleAdminRelaysPage() {
+    if (!requireAdmin()) return;
+    sendFile("/relays.html", "text/html; charset=utf-8");
 }
 
 void handleStatus() {
@@ -191,7 +199,7 @@ void handleRelayCommand() {
     sendJson(200, response);
 }
 
-void handleAdminConfigGet() {
+void handleAdminRelaysGet() {
     if (!requireAdmin()) return;
 
     const AppConfig& cfg = Config::get();
@@ -245,7 +253,7 @@ void copyArg(char* dst, size_t size, const String& value) {
     dst[n] = '\0';
 }
 
-void handleAdminConfigPost() {
+void handleAdminRelaysPost() {
     if (!requireAdmin()) return;
 
     if (!server.hasArg("relayCount")) {
@@ -312,6 +320,109 @@ void handleAdminConfigPost() {
     sendJson(200, "{\"ok\":true}");
 }
 
+bool validHostname(const String& value) {
+    if (!value.length() || value.length() >= STATION_NAME_SIZE) return false;
+    for (size_t i = 0; i < value.length(); ++i) {
+        const char c = value[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '-')) return false;
+    }
+    return value[0] != '-' && value[value.length() - 1] != '-';
+}
+
+void handleAdminSettingsGet() {
+    if (!requireAdmin()) return;
+    const AppConfig& cfg = Config::get();
+    String json;
+    json.reserve(700);
+    json += F("{\"stationName\":");
+    appendJsonString(json, cfg.stationName);
+    json += F(",\"timezone\":");
+    appendJsonString(json, cfg.timezone);
+    json += F(",\"ntp0\":");
+    appendJsonString(json, cfg.ntpServers[0]);
+    json += F(",\"ntp1\":");
+    appendJsonString(json, cfg.ntpServers[1]);
+    for (uint8_t i = 0; i < WIFI_PROFILE_COUNT; ++i) {
+        json += F(",\"ssid"); json += String(i); json += F("\":");
+        appendJsonString(json, cfg.wifi[i].ssid);
+        json += F(",\"passwordSet"); json += String(i); json += F("\":");
+        json += cfg.wifi[i].password[0] ? F("true") : F("false");
+    }
+    json += '}';
+    sendJson(200, json);
+}
+
+void handleAdminSettingsPost() {
+    if (!requireAdmin()) return;
+    const char* required[] = {"stationName", "timezone", "ntp0", "ntp1", "ssid0", "password0", "clearPassword0", "ssid1", "password1", "clearPassword1", "adminPassword"};
+    for (const char* key : required) {
+        if (!server.hasArg(key)) {
+            sendJson(400, "{\"error\":\"missing_settings_fields\"}");
+            return;
+        }
+    }
+
+    const String stationName = server.arg("stationName");
+    const String timezone = server.arg("timezone");
+    const String ntp0 = server.arg("ntp0");
+    const String ntp1 = server.arg("ntp1");
+    const String ssid0 = server.arg("ssid0");
+    const String ssid1 = server.arg("ssid1");
+    const String password0 = server.arg("password0");
+    const String password1 = server.arg("password1");
+    const String newAdminPassword = server.arg("adminPassword");
+
+    if (!validHostname(stationName) || timezone.length() == 0 || timezone.length() >= TIMEZONE_SIZE ||
+        ntp0.length() >= NTP_SERVER_SIZE || ntp1.length() >= NTP_SERVER_SIZE ||
+        ssid0.length() >= WIFI_SSID_SIZE || ssid1.length() >= WIFI_SSID_SIZE ||
+        password0.length() >= WIFI_PASSWORD_SIZE || password1.length() >= WIFI_PASSWORD_SIZE) {
+        sendJson(400, "{\"error\":\"invalid_or_too_long_field\"}");
+        return;
+    }
+    if (newAdminPassword.length() > 0 &&
+        (newAdminPassword.length() < 8 || newAdminPassword.length() >= ADMIN_PASSWORD_SIZE)) {
+        sendJson(400, "{\"error\":\"admin_password_must_be_8_to_63_chars\"}");
+        return;
+    }
+
+    AppConfig& cfg = Config::get();
+    bool wifiChanged = false;
+    for (uint8_t i = 0; i < WIFI_PROFILE_COUNT; ++i) {
+        const String ssid = server.arg(String("ssid") + String(i));
+        const String password = server.arg(String("password") + String(i));
+        const bool clearPassword = server.arg(String("clearPassword") + String(i)) == "1";
+        char oldSsid[WIFI_SSID_SIZE];
+        char oldPassword[WIFI_PASSWORD_SIZE];
+        memcpy(oldSsid, cfg.wifi[i].ssid, sizeof(oldSsid));
+        memcpy(oldPassword, cfg.wifi[i].password, sizeof(oldPassword));
+        const bool ssidChanged = ssid != String(oldSsid);
+        copyArg(cfg.wifi[i].ssid, WIFI_SSID_SIZE, ssid);
+        if (!ssid.length() || clearPassword || (ssidChanged && !password.length())) {
+            cfg.wifi[i].password[0] = '\0';
+        } else if (password.length()) {
+            copyArg(cfg.wifi[i].password, WIFI_PASSWORD_SIZE, password);
+        }
+        if (strcmp(oldSsid, cfg.wifi[i].ssid) != 0 ||
+            strcmp(oldPassword, cfg.wifi[i].password) != 0) wifiChanged = true;
+    }
+
+    if (stationName != String(cfg.stationName)) wifiChanged = true;
+    copyArg(cfg.stationName, STATION_NAME_SIZE, stationName);
+    copyArg(cfg.timezone, TIMEZONE_SIZE, timezone);
+    copyArg(cfg.ntpServers[0], NTP_SERVER_SIZE, ntp0);
+    copyArg(cfg.ntpServers[1], NTP_SERVER_SIZE, ntp1);
+    if (newAdminPassword.length()) copyArg(cfg.adminPassword, ADMIN_PASSWORD_SIZE, newAdminPassword);
+
+    if (!Config::saveNow()) {
+        sendJson(500, "{\"error\":\"config_save_failed\"}");
+        return;
+    }
+    TimeManager::reconfigure();
+    sendJson(200, wifiChanged ? "{\"ok\":true,\"wifiChanged\":true}" : "{\"ok\":true,\"wifiChanged\":false}");
+    if (wifiChanged) WifiManager::reconfigure();
+}
+
 void handleNotFound() {
     if (server.uri().startsWith("/api/")) {
         sendJson(404, "{\"error\":\"not_found\"}");
@@ -327,12 +438,15 @@ namespace WebServerModule {
 void begin() {
     server.on("/", HTTP_GET, handleRoot);
     server.on("/admin", HTTP_GET, handleAdminPage);
+    server.on("/admin/relays", HTTP_GET, handleAdminRelaysPage);
 
     server.on("/api/status", HTTP_GET, handleStatus);
     server.on("/api/relay", HTTP_POST, handleRelayCommand);
 
-    server.on("/api/admin/config", HTTP_GET, handleAdminConfigGet);
-    server.on("/api/admin/config", HTTP_POST, handleAdminConfigPost);
+    server.on("/api/admin/settings", HTTP_GET, handleAdminSettingsGet);
+    server.on("/api/admin/settings", HTTP_POST, handleAdminSettingsPost);
+    server.on("/api/admin/relays", HTTP_GET, handleAdminRelaysGet);
+    server.on("/api/admin/relays", HTTP_POST, handleAdminRelaysPost);
 
     server.on("/style.css", HTTP_GET, []() {
         sendFile("/style.css", "text/css; charset=utf-8");
@@ -346,12 +460,23 @@ void begin() {
         sendFile("/admin.js", "application/javascript; charset=utf-8");
     });
 
+    server.on("/relays.js", HTTP_GET, []() {
+        sendFile("/relays.js", "application/javascript; charset=utf-8");
+    });
+
     server.onNotFound(handleNotFound);
     server.begin();
 
     Serial.println(F("[Web] HTTP server started on port 80"));
-    Serial.print(F("[Web] Open: http://"));
-    Serial.println(WiFi.softAPIP());
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.print(F("[Web] Open: http://"));
+        Serial.println(WiFi.localIP());
+    } else if (WifiManager::inSetupMode()) {
+        Serial.print(F("[Web] Open: http://"));
+        Serial.println(WiFi.softAPIP());
+    } else {
+        Serial.println(F("[Web] Waiting for Wi-Fi connection; IP will be printed by WifiManager"));
+    }
 }
 
 void loop() {
