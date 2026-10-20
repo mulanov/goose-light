@@ -24,9 +24,9 @@ void startSetupAP() {
     WiFi.disconnect();
     WiFi.mode(WIFI_AP);
     // Change this password before deployment.
-    WiFi.softAP("SmartLights-Setup", "setup1234");
+    WiFi.softAP("GooseLight-Setup", "setup1234");
     state = State::AccessPoint;
-    Serial.println(F("[WiFi] Setup AP: SmartLights-Setup"));
+    Serial.println(F("[WiFi] Setup AP: GooseLight-Setup"));
     Serial.println(F("[WiFi] AP password: setup1234"));
 }
 }

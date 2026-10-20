@@ -1,3 +1,4 @@
+#include "Config.h"
 #include "Radio433.h"
 #include "Rules.h"
 #include <SoftwareSerial.h>

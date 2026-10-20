@@ -38,7 +38,7 @@ void setDefaults(AppConfig& c) {
         c.relays[i].startupOn = false;
     }
 
-    copyString(c.stationName, sizeof(c.stationName), "SmartLights");
+    copyString(c.stationName, sizeof(c.stationName), "GooseLights");
 
     copyString(c.ntpServers[0], NTP_SERVER_SIZE, "pool.ntp.org");
     copyString(c.ntpServers[1], NTP_SERVER_SIZE, "time.google.com");
@@ -100,6 +100,7 @@ bool validateConfig(AppConfig& c) {
         c.ntpServers[i][NTP_SERVER_SIZE - 1] = '\0';
     }
 
+    c.stationName[STATION_NAME_SIZE - 1] = '\0';
     c.timezone[TIMEZONE_SIZE - 1] = '\0';
     c.adminPassword[ADMIN_PASSWORD_SIZE - 1] = '\0';
     c.mqtt.host[MQTT_HOST_SIZE - 1] = '\0';

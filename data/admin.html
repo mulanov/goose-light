@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Настройки goose-light</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Настройки</h1>
+      <p>goose-light</p>
+    </div>
+    <a href="/">К управлению реле</a>
+  </header>
+
+  <main>
+    <p id="message" role="status">Загрузка конфигурации…</p>
+
+    <form id="config-form">
+      <div class="field">
+        <label for="relay-count">Количество активных реле</label>
+        <input id="relay-count" type="number" min="1" max="24" required>
+      </div>
+
+      <section id="relay-settings"></section>
+
+      <button type="submit">Сохранить настройки</button>
+    </form>
+  </main>
+</body>
+</html>

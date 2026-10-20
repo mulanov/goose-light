@@ -1,4 +1,7 @@
 #pragma once
+
+#include <stdint.h>
+
 namespace Mqtt {
     void begin();
     void loop();

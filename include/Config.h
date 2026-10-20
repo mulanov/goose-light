@@ -15,6 +15,7 @@ constexpr size_t RELAY_COMMENT_SIZE = 96;
 constexpr size_t RADIO_NAME_SIZE = 25;
 constexpr size_t RADIO_COMMENT_SIZE = 128;
 constexpr size_t RADIO_CODE_SIZE = 32;
+constexpr size_t STATION_NAME_SIZE = 33;
 constexpr size_t WIFI_SSID_SIZE = 33;
 constexpr size_t WIFI_PASSWORD_SIZE = 64;
 constexpr size_t NTP_SERVER_SIZE = 64;
@@ -85,6 +86,7 @@ struct AppConfig {
     WifiProfile wifi[WIFI_PROFILE_COUNT];
     char ntpServers[NTP_SERVER_COUNT][NTP_SERVER_SIZE];
     char timezone[TIMEZONE_SIZE];  // POSIX TZ string
+    char stationName[STATION_NAME_SIZE];
     MqttConfig mqtt;
     char adminPassword[ADMIN_PASSWORD_SIZE];
     uint16_t schemaVersion;

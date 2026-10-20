@@ -13,14 +13,14 @@ void setup() {
     Serial.begin(115200);
     delay(50);
     Serial.println();
-    Serial.println(F("\n[SmartLights] Boot"));
+    Serial.println(F("\n[GooseLight] Boot"));
 
     // Initialize shift-register GPIOs and drive all outputs to OFF first.
     // If storage initialization fails, we leave the hardware in this safe state.
     Relay::begin();
 
     if (!Config::begin()) {
-        Serial.println(F("[SmartLights] FATAL: configuration storage unavailable"));
+        Serial.println(F("[GooseLight] FATAL: configuration storage unavailable"));
         Relay::allOff();
         return;
     }
